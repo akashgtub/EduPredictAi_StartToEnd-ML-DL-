@@ -8,15 +8,12 @@ from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-# 1. Load dataset
 df = pd.read_csv("data/data.csv", sep=";")
 df.columns = df.columns.str.strip()
 
-# 2. Separate features and target
 X = df.drop(columns=["Target"])
 y = df["Target"]
 
-# 3. Identify categorical columns
 categorical_cols = [
     "Marital status",
     "Application mode",
@@ -42,7 +39,6 @@ numeric_cols = [
     col for col in X.columns if col not in categorical_cols
 ]
 
-# 4. Preprocess the features
 preprocessor = ColumnTransformer(
     transformers=[
         ("categorical", OneHotEncoder(handle_unknown="ignore"),
@@ -51,7 +47,6 @@ preprocessor = ColumnTransformer(
     ]
 )
 
-# 5. Create the model pipeline
 model = Pipeline(steps=[
     ("preprocessing", preprocessor),
     ("classifier", RandomForestClassifier(
@@ -61,7 +56,6 @@ model = Pipeline(steps=[
     ))
 ])
 
-# 6. Split data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -70,13 +64,23 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
-# 7. Train the model
 model.fit(X_train, y_train)
 
-# 8. Make predictions
 y_pred = model.predict(X_test)
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score
+)
 
-# 9. Evaluate
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Macro F1:", f1_score(y_test, y_pred, average="macro"))
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
 print("Training samples:", len(X_train))
 print("Testing samples:", len(X_test))
 print("Accuracy:", round(accuracy_score(y_test, y_pred), 4))
@@ -87,7 +91,6 @@ print(classification_report(y_test, y_pred, zero_division=0))
 print("\nConfusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
 
-# 10. Save the trained model
 import joblib
 joblib.dump(model, "student_success_model.joblib")
 
