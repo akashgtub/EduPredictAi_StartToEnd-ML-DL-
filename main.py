@@ -47,15 +47,19 @@ preprocessor = ColumnTransformer(
     ]
 )
 
-model = Pipeline(steps=[
-    ("preprocessing", preprocessor),
-    ("classifier", RandomForestClassifier(
-        n_estimators=200,
-        random_state=42,
-        class_weight="balanced"
-    ))
-])
-
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+from sklearn.base import clone
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    classification_report,
+    confusion_matrix
+)
+import joblib
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -63,35 +67,71 @@ X_train, X_test, y_train, y_test = train_test_split(
     random_state=42,
     stratify=y
 )
+# Reuse your existing preprocessor from Stage 1
 
-model.fit(X_train, y_train)
+models = {
+    "Logistic Regression": LogisticRegression(
+        max_iter=2000,
+        class_weight="balanced"
+    ),
+    "Decision Tree": DecisionTreeClassifier(
+        random_state=42,
+        class_weight="balanced"
+    ),
+    "Random Forest": RandomForestClassifier(
+        n_estimators=200,
+        random_state=42,
+        class_weight="balanced",
+        n_jobs=-1
+    )
+}
 
-y_pred = model.predict(X_test)
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    confusion_matrix,
-    f1_score
-)
+results = {}
+pipelines = {}
 
-print("Accuracy:", accuracy_score(y_test, y_pred))
-print("Macro F1:", f1_score(y_test, y_pred, average="macro"))
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred))
-print("\nConfusion Matrix:")
-print(confusion_matrix(y_test, y_pred))
+# Compare models using 5-fold cross-validation on training data
+for name, classifier in models.items():
+    pipeline = Pipeline([
+        ("preprocessing", clone(preprocessor)),
+        ("classifier", classifier)
+    ])
 
-print("Training samples:", len(X_train))
-print("Testing samples:", len(X_test))
-print("Accuracy:", round(accuracy_score(y_test, y_pred), 4))
+    scores = cross_val_score(
+        pipeline,
+        X_train,
+        y_train,
+        cv=5,
+        scoring="f1_macro",
+        n_jobs=-1
+    )
+
+    results[name] = scores.mean()
+    pipelines[name] = pipeline
+
+    print(f"{name}: Macro F1 = {scores.mean():.4f}")
+
+# Select the best model using cross-validation
+best_name = max(results, key=results.get)
+best_model = pipelines[best_name]
+
+print("\nBest model:", best_name)
+print("Cross-validation Macro F1:", round(results[best_name], 4))
+
+# Train the selected model on all training data
+best_model.fit(X_train, y_train)
+
+# Evaluate once on the held-out test data
+y_pred = best_model.predict(X_test)
+
+print("\nTest Accuracy:", round(accuracy_score(y_test, y_pred), 4))
+print("Test Macro F1:", round(f1_score(y_test, y_pred, average="macro"), 4))
 
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred, zero_division=0))
 
-print("\nConfusion Matrix:")
+print("Confusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
 
-import joblib
-joblib.dump(model, "student_success_model.joblib")
-
-print("\nModel saved successfully!")
+# Save the selected pipeline
+joblib.dump(best_model, "student_success_model.joblib")
+print("\nBest model saved!")
